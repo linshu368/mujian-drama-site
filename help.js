@@ -1,0 +1,1 @@
+const input=document.querySelector('#help-search'),items=[...document.querySelectorAll('[data-faq]')];input.addEventListener('input',()=>{let q=input.value.trim().toLowerCase(),visible=0;items.forEach(item=>{let match=item.textContent.toLowerCase().includes(q);item.hidden=!match;if(match)visible++});document.querySelector('#faq-empty').hidden=visible>0});
