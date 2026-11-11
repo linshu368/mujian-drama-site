@@ -1,12 +1,95 @@
-const grid=document.querySelector('#cards'),modal=document.querySelector('#modal'),title=document.querySelector('#modal-title'),body=document.querySelector('#modal-body'),search=document.querySelector('#search');let filter='全部',currentDrama=null;
-const defaults={favorites:[],history:[],demoUnlocked:[]};function readState(){try{const v=JSON.parse(localStorage.getItem('mujian-demo-v1')||'{}');return {...defaults,...v,favorites:Array.isArray(v.favorites)?v.favorites:[],history:Array.isArray(v.history)?v.history:[],demoUnlocked:Array.isArray(v.demoUnlocked)?v.demoUnlocked:[]}}catch{return {...defaults}}}let state=readState();function save(){try{localStorage.setItem('mujian-demo-v1',JSON.stringify(state))}catch{}}function findDrama(id){return dramas.find(d=>d.id===id)}function openModal(){if(!modal.open)modal.showModal()}function setContent(heading,html){title.textContent=heading;body.innerHTML=html;openModal()}function render(){const q=search.value.trim().toLowerCase();let results=dramas.filter(d=>(filter==='全部'||d.tag===filter)&&(`${d.title} ${d.tag} ${d.desc}`+' '+window.mujianEnglish(`${d.title} ${d.tag} ${d.desc}`)).toLowerCase().includes(q));const sort=document.querySelector('#sort');if(sort&&sort.value==='title')results.sort((a,b)=>(window.mujianLanguage==='en'?window.mujianEnglish(a.title):a.title).localeCompare(window.mujianLanguage==='en'?window.mujianEnglish(b.title):b.title,window.mujianLanguage==='en'?'en':'zh-CN'));if(sort&&sort.value==='reverse')results.reverse();grid.innerHTML='';results.forEach(d=>{let card=document.createElement('article');card.className='card';card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label','查看'+d.title);card.innerHTML=`<div class="poster ${d.style}"><span class="poster-tag">${d.tag}</span></div><h3>${d.title}</h3><p>${d.desc}</p>`;card.addEventListener('click',()=>openDrama(d.id));card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDrama(d.id)}});grid.appendChild(card)});document.querySelector('#empty').hidden=results.length>0}render();search.addEventListener('input',render);document.querySelector('#sort')?.addEventListener('change',render);document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));render()}));
-function favoriteButton(d){const fav=state.favorites.includes(d.id);return `<button class="detail-favorite ${fav?'is-favorite':''}" data-favorite="${d.id}" aria-pressed="${fav}">${fav?'♥ 已收藏':'♡ 收藏'}</button>`}
-function openDrama(id,episode=1){const d=findDrama(id);if(!d)return;currentDrama=id;const accessible=state.demoUnlocked.includes(id);const playerText=accessible?`第 ${episode} 集 · 播放区域`:`第 ${episode} 集 · 付费内容`;const playerSub=accessible?'视频内容尚未接入':'解锁后观看全部剧集';setContent(d.title,`<div class="detail-player ${d.style}"><div class="player-label"><span>▶</span><strong>${playerText}</strong><small>${playerSub}</small>${!accessible?`<button class="gold-button" data-checkout="${d.id}" data-episode="${episode}">查看解锁流程</button>`:''}</div></div><div class="detail-meta"><div><span class="pill">${d.tag}</span><span>共 6 集</span></div><div class="detail-actions">${favoriteButton(d)}<button class="detail-favorite" data-share="${d.id}">↗ 分享</button></div></div><p class="modal-description">${d.story}</p><div class="episodes-head"><b>选集</b><span>剧集需解锁</span></div><div class="episodes">${[1,2,3,4,5,6].map(n=>`<button class="${n===episode?'selected':''}" data-watch="${d.id}" data-episode="${n}" aria-pressed="${n===episode}">第 ${n} 集 ${!state.demoUnlocked.includes(id)?'<small>⌑</small>':''}</button>`).join('')}</div><div class="demo-disclosure">视频与支付尚未接入。</div>`)}
-function watch(id,episode){state.history=[{id,episode},...state.history.filter(h=>h.id!==id)].slice(0,8);save();openDrama(id,episode)}
-function showLibrary(){const favorites=state.favorites.map(findDrama).filter(Boolean),history=state.history.map(h=>({...h,drama:findDrama(h.id)})).filter(h=>h.drama);const renderItems=(items,type)=>items.length?`<div class="library-list">${items.map(item=>{const d=type==='history'?item.drama:item;return `<button class="library-item" data-watch="${d.id}" data-episode="${type==='history'?item.episode:1}"><span class="mini-poster ${d.style}"></span><span><strong>${d.title}</strong><small>${type==='history'?`看到第 ${item.episode} 集`:`${d.tag}`}</small></span><i>↗</i></button>`}).join('')}</div>`:`<div class="library-empty">${type==='history'?'还没有观看记录，去发现一部喜欢的剧吧。':'还没有收藏的剧集，遇到喜欢的故事可以收藏。'}</div>`;setContent('我的片单',`<div class="library-section"><div class="library-title"><b>最近浏览</b>${history.length?'<button data-clear-history>清除记录</button>':''}</div>${renderItems(history,'history')}</div><div class="library-section"><div class="library-title"><b>我的收藏</b></div>${renderItems(favorites,'favorites')}</div><div class="demo-disclosure">片单和记录仅保存在当前浏览器中，清理浏览器数据后会消失。</div>`)}
-function checkout(id,episode){const d=findDrama(id);if(!d)return;setContent('解锁剧集',`<p class="modal-description">查看剧集购买信息。</p><div class="order-box"><div><span>剧集</span><strong>${d.title}</strong></div><div><span>内容</span><strong>整部剧集</strong></div><div><span>价格</span><strong class="price">待公布</strong></div></div><div class="demo-disclosure">视频与支付尚未接入，不会扣款或创建订单。</div><button class="checkout-button" data-confirm-demo="${id}" data-episode="${episode}">查看解锁流程</button><button class="back-button" data-open-drama="${id}" data-episode="${episode}">返回剧集</button>`)}
-function demoSuccess(id,episode){if(!state.demoUnlocked.includes(id))state.demoUnlocked.push(id);save();setContent('操作完成',`<div class="success-icon">✓</div><p class="success-title">已完成解锁流程</p><p class="modal-description centered">未发生支付。视频内容尚未接入。</p><button class="checkout-button" data-watch="${id}" data-episode="${episode}">返回选集</button>`)}
-function info(key){if(key==='service')setContent('观看与付费',`<p class="modal-description">你可以浏览短剧介绍、选择剧集，并查看购买流程。未来提供服务时，具体价格、观看范围与付费方式将在购买前展示。</p><div class="info-grid"><div><b>浏览介绍</b><p>购买前可查看剧情介绍与集数。</p></div><div><b>付费观看</b><p>剧集解锁后即可观看完整内容。</p></div><div><b>订单与售后</b><p>正式服务的订单及退款规则将在上线前公布。</p></div></div><div class="demo-disclosure">视频与支付尚未接入，价格和规则将于上线前公布。</div>`);else if(key==='contact')setContent('联系我们','<p class="modal-description">商务合作、观看及订单问题，可以通过正式公布的联系方式与我们联系。</p><div class="demo-disclosure">商户名称及联系方式待补充。</div>');else if(key==='faq')setContent('常见问题',`<div class="faq"><details><summary>如何找到喜欢的剧集？</summary><p>在发现页面按题材筛选，或通过搜索框查找剧名和题材。</p></details><details><summary>可以实际播放视频吗？</summary><p>视频内容尚未接入。</p></details><details><summary>现在可以购买吗？</summary><p>支付尚未接入，不会扣款或产生订单。</p></details><details><summary>收藏和记录保存在哪里？</summary><p>保存在当前浏览器本地，不会同步到其他设备。</p></details></div>`)}
-document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>{const action=b.dataset.action;if(action==='search'){document.querySelector('#discover').scrollIntoView({behavior:'smooth'});search.focus({preventScroll:true})}else if(action==='library')showLibrary();else info(action)}));body.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;e.stopPropagation();if(b.dataset.share){const u=new URL('catalog.html',location.href);u.searchParams.set('drama',b.dataset.share);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(u.href).then(()=>{b.textContent='✓ 已复制'}).catch(()=>{b.textContent='无法复制链接'})}else{b.textContent='无法复制链接'}}else if(b.dataset.favorite){const id=b.dataset.favorite;state.favorites=state.favorites.includes(id)?state.favorites.filter(x=>x!==id):[id,...state.favorites];save();const fav=state.favorites.includes(id);b.textContent=fav?'♥ 已收藏':'♡ 收藏';b.classList.toggle('is-favorite',fav);b.setAttribute('aria-pressed',String(fav))}else if(b.dataset.watch)watch(b.dataset.watch,Number(b.dataset.episode));else if(b.dataset.checkout)checkout(b.dataset.checkout,Number(b.dataset.episode));else if(b.dataset.confirmDemo)demoSuccess(b.dataset.confirmDemo,Number(b.dataset.episode));else if(b.dataset.openDrama)openDrama(b.dataset.openDrama,Number(b.dataset.episode));else if(b.hasAttribute('data-clear-history')){state.history=[];save();showLibrary()}});document.querySelector('.close').addEventListener('click',()=>modal.close());modal.addEventListener('click',e=>{if(e.target===modal)modal.close()});
-
-const requestedDrama=new URLSearchParams(location.search).get('drama');if(requestedDrama&&findDrama(requestedDrama))openDrama(requestedDrama,Number(new URLSearchParams(location.search).get('episode'))||1);
+const grid = document.querySelector('#cards');
+const modal = document.querySelector('#modal');
+const heading = document.querySelector('#modal-title');
+const body = document.querySelector('#modal-body');
+const search = document.querySelector('#search');
+let filter = '全部', detailRequest, player;
+const state = window.MujianStore.read();
+function element(tag, text, className) {
+  const el = document.createElement(tag); if (text) el.textContent = text; if (className) el.className = className; return el;
+}
+function poster(drama) {
+  const cover = element('div', '', 'poster');
+  if (drama.cover_url) {
+    try {
+      const url = new URL(drama.cover_url);
+      if (url.protocol === 'https:') { const image = element('img'); image.src = url.href; image.alt = ''; image.loading = 'lazy'; cover.append(image); }
+    } catch {}
+  }
+  cover.append(element('span', drama.tags.join(' · '), 'poster-tag'));
+  return cover;
+}
+function render() {
+  const q = search.value.trim().toLowerCase();
+  const results = dramas.filter(d => (filter === '全部' || d.tags.includes(filter)) && `${d.title} ${d.tags.join(' ')} ${d.description}`.toLowerCase().includes(q));
+  const sort = document.querySelector('#sort').value;
+  if (sort === 'title') results.sort((a, b) => a.title.localeCompare(b.title));
+  if (sort === 'reverse') results.reverse();
+  grid.replaceChildren();
+  for (const drama of results) {
+    const card = element('article', '', 'card'); card.tabIndex = 0; card.setAttribute('role', 'button'); card.setAttribute('aria-label', '查看' + drama.title);
+    const title = element('h3', drama.title); title.dataset.contentTitle = '';
+    card.append(poster(drama), title, element('p', `${drama.episode_count} 集 · ${drama.description}`));
+    card.addEventListener('click', () => openDrama(drama.id));
+    card.addEventListener('keydown', e => { if (['Enter', ' '].includes(e.key)) { e.preventDefault(); openDrama(drama.id); } });
+    grid.append(card);
+  }
+  document.querySelector('#empty').hidden = results.length > 0;
+}
+async function openDrama(id, videoId) {
+  detailRequest?.abort(); player?.destroy();
+  const request = new AbortController(); detailRequest = request;
+  heading.textContent = '正在加载剧集'; body.replaceChildren(); if (!modal.open) modal.showModal();
+  try {
+    const { drama } = await window.MujianAPI.request('/api/dramas/' + encodeURIComponent(id), undefined, request.signal);
+    if (request.signal.aborted) return;
+    heading.textContent = drama.title; heading.dataset.contentTitle = '';
+    const container = element('div', '', 'detail-player'); container.dataset.mujianPlayback = '';
+    const favorite = element('button', '', 'detail-favorite');
+    const updateFavorite = () => { favorite.textContent = state.favorites.includes(id) ? '♥ 已收藏' : '♡ 收藏'; favorite.setAttribute('aria-pressed', String(state.favorites.includes(id))); };
+    updateFavorite();
+    favorite.addEventListener('click', () => { state.favorites = state.favorites.includes(id) ? state.favorites.filter(x => x !== id) : [id, ...state.favorites]; window.MujianStore.write(state); updateFavorite(); });
+    const share = element('button', '↗ 分享', 'detail-favorite');
+    share.addEventListener('click', async () => { const url = new URL('catalog.html', location.href); url.searchParams.set('drama', id); try { await navigator.clipboard.writeText(url.href); share.textContent = '已复制'; } catch { share.textContent = '无法复制链接'; } });
+    const episodes = element('div', '', 'episodes');
+    body.append(container, element('p', `${drama.videos.length} 集 · 免费观看`), favorite, share, element('p', drama.description, 'modal-description'), element('h3', '选集'), episodes);
+    player = window.MujianPlayer.create(container, item => {
+      state.history = [{ id, videoId: item.id }, ...state.history.filter(h => h.id !== id)].slice(0, 50);
+      window.MujianStore.write(state);
+      for (const button of episodes.children) { const selected = button.dataset.videoId === item.id; button.classList.toggle('selected', selected); button.setAttribute('aria-pressed', String(selected)); }
+    });
+    for (const [index, item] of drama.videos.entries()) {
+      const button = element('button', item.episode || item.title || `第 ${index + 1} 集`);
+      button.dataset.videoId = item.id; button.addEventListener('click', () => player.select(drama, item)); episodes.append(button);
+    }
+    const selected = drama.videos.find(v => v.id === videoId) || drama.videos[0];
+    if (selected) player.select(drama, selected); else container.textContent = '暂无可播放集数';
+  } catch (error) {
+    if (request.signal.aborted) return;
+    if (error.status === 401) window.MujianAPI.openPrompt(body);
+    else { const retry = element('button', '加载失败，点击重试'); retry.addEventListener('click', () => openDrama(id, videoId)); body.replaceChildren(retry); }
+  }
+}
+async function loadCatalog() {
+  grid.textContent = '正在加载剧集…';
+  try {
+    await window.MujianCatalog(); render();
+    const params = new URLSearchParams(location.search);
+    if (params.get('drama')) void openDrama(params.get('drama'), params.get('video'));
+  } catch (error) {
+    if (error.status === 401) window.MujianAPI.openPrompt(grid);
+    else { const retry = element('button', '目录加载失败，点击重试'); retry.addEventListener('click', loadCatalog); grid.replaceChildren(retry); }
+  }
+}
+search.addEventListener('input', render);
+document.querySelector('#sort').addEventListener('change', render);
+document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => { filter = button.dataset.filter; document.querySelectorAll('[data-filter]').forEach(b => b.classList.toggle('active', b === button)); render(); }));
+document.querySelector('.close').addEventListener('click', () => modal.close());
+modal.addEventListener('close', () => { detailRequest?.abort(); player?.destroy(); });
+modal.addEventListener('click', e => { if (e.target === modal) modal.close(); });
+window.addEventListener('pagehide', () => { detailRequest?.abort(); player?.destroy(); });
+document.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', () => {
+  if (button.dataset.action === 'search') { search.scrollIntoView(); search.focus(); }
+  else { heading.textContent = '联系我们'; body.textContent = '请通过秘境官方社群交流反馈。'; if (!modal.open) modal.showModal(); }
+}));
+void loadCatalog();
