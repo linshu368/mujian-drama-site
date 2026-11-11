@@ -1,1 +1,35 @@
-const storeKey='mujian-demo-v1';let current='history';function load(){try{let raw=JSON.parse(localStorage.getItem(storeKey)||'{}');return {...raw,history:Array.isArray(raw.history)?raw.history:[],favorites:Array.isArray(raw.favorites)?raw.favorites:[]}}catch{return {history:[],favorites:[]}}}function save(state){try{localStorage.setItem(storeKey,JSON.stringify(state))}catch{}}function render(){const state=load(),items=current==='history'?state.history.map(x=>({...x,drama:dramas.find(d=>d.id===x.id)})).filter(x=>x.drama):state.favorites.map(id=>({id,drama:dramas.find(d=>d.id===id)})).filter(x=>x.drama);document.querySelector('#history-count').textContent=state.history.length;document.querySelector('#favorite-count').textContent=state.favorites.length;document.querySelector('#tab-title').textContent=current==='history'?'最近浏览':'我的收藏';document.querySelector('#tab-overline').textContent=current==='history'?'RECENTLY VIEWED':'SAVED STORIES';document.querySelector('#clear-history').hidden=current!=='history'||!items.length;document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===current));document.querySelector('#library-content').innerHTML=items.length?`<div class="saved-grid">${items.map(x=>`<article class="saved-card"><a href="catalog.html?drama=${encodeURIComponent(x.id)}&episode=${x.episode||1}"><div class="saved-poster ${x.drama.style}"></div><strong>${x.drama.title}</strong><small>${current==='history'?`最近选择第 ${x.episode} 集`:x.drama.tag}</small></a><button class="remove-item" data-remove="${x.id}" aria-label="移除${x.drama.title}">移除</button></article>`).join('')}</div>`:`<div class="empty-library"><div class="empty-icon">♡</div><h3>${current==='history'?'还没有浏览记录':'还没有收藏的剧集'}</h3><p>去发现一个感兴趣的故事吧。</p><a href="catalog.html">浏览全部剧集 ↗</a></div>`}document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{current=b.dataset.tab;render()}));document.querySelector('#clear-history').addEventListener('click',()=>{const state=load();state.history=[];save(state);render()});document.querySelector('#library-content').addEventListener('click',e=>{let b=e.target.closest('[data-remove]');if(!b)return;const state=load();if(current==='history')state.history=state.history.filter(x=>x.id!==b.dataset.remove);else state.favorites=state.favorites.filter(x=>x!==b.dataset.remove);save(state);render()});render();
+let current = 'history';
+const content = document.querySelector('#library-content');
+function render() {
+  const state = window.MujianStore.read();
+  const items = (current === 'history' ? state.history : state.favorites.map(id => ({ id })))
+    .map(item => ({ ...item, drama: dramas.find(d => d.id === item.id) })).filter(item => item.drama);
+  document.querySelector('#history-count').textContent = state.history.length;
+  document.querySelector('#favorite-count').textContent = state.favorites.length;
+  document.querySelector('#tab-title').textContent = current === 'history' ? '最近浏览' : '我的收藏';
+  document.querySelector('#clear-history').hidden = current !== 'history' || !items.length;
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === current));
+  content.replaceChildren();
+  if (!items.length) { content.textContent = '暂无记录，去发现喜欢的故事吧。'; return; }
+  const list = document.createElement('div'); list.className = 'saved-grid';
+  for (const item of items) {
+    const card = document.createElement('article'); card.className = 'saved-card';
+    const link = document.createElement('a');
+    const params = new URLSearchParams({ drama: item.id }); if (item.videoId) params.set('video', item.videoId);
+    link.href = 'catalog.html?' + params; link.textContent = item.drama.title; link.dataset.contentTitle = '';
+    const remove = document.createElement('button'); remove.textContent = '移除'; remove.className = 'remove-item';
+    remove.addEventListener('click', () => { const latest = window.MujianStore.read(); if (current === 'history') latest.history = latest.history.filter(x => x.id !== item.id); else latest.favorites = latest.favorites.filter(id => id !== item.id); window.MujianStore.write(latest); render(); });
+    card.append(link, remove); list.append(card);
+  }
+  content.append(list);
+}
+document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => { current = button.dataset.tab; render(); }));
+document.querySelector('#clear-history').addEventListener('click', () => { const state = window.MujianStore.read(); state.history = []; window.MujianStore.write(state); render(); });
+async function load() {
+  try { await window.MujianCatalog(); render(); }
+  catch (error) {
+    if (error.status === 401) window.MujianAPI.openPrompt(content);
+    else { const retry = document.createElement('button'); retry.textContent = '片单加载失败，点击重试'; retry.onclick = load; content.replaceChildren(retry); }
+  }
+}
+void load();
