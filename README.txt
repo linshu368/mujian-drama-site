@@ -1,4 +1,4 @@
-幕间短剧 · 本地接入（未部署）
+幕间短剧 · 真实内容接入
 
 目录和详情使用秘境 GET /api/dramas、GET /api/dramas/:id；播放使用 POST /api/dramas/play。
 本期全部免费观看，没有支付和解锁流程。收藏与浏览记录用真实剧集 ID / 视频 ID，
@@ -14,7 +14,7 @@
 mujian-config.js 在 localhost/127.0.0.1 使用 http://localhost:3001；线上使用已核对的生产 API：https://stminiapp-production.up.railway.app。
 真实本地联调需要配置可用的隔离测试后端/内容、执行已批准的 TEST 迁移、与 Bot 匹配的
 合法 Telegram initData 及 Telegram 可访问的 HTTPS 联调地址。不要把真实身份手动存入文件，
-不要将本地测试请求改指生产库。上述环境本次未建立，也未改 BotFather 地址。
+不要将本地测试请求改指生产库。BotFather 使用既有绑定地址。
 
 可重复的模拟播放/弹窗体验：
   cd /Users/qj/python_project/ST_miniAPP_mujian
@@ -39,6 +39,8 @@ mujian-config.js 在 localhost/127.0.0.1 使用 http://localhost:3001；线上�
 会话存储不可用时只能保证当前文档内去重。彻底关闭应用后不能弹窗。
 
 后端本地改动在 /Users/qj/python_project/ST_miniAPP_mujian，分支 feat/mujian-entry-funnel。
-迁移文件 20261111_mujian_entry_funnel.sql 仅在一次性本地 PostgreSQL 验证，未执行线上迁移。
-登记 mujian_dzmm 的 SQL 已准备；线上登记状态本次未复核。
+渠道 mujian_dzmm 和进入事实表由 20261111_mujian_entry_funnel.sql 管理。
+发布顺序为 TEST 迁移与回滚验证 → 生产迁移 → 后端 → 秘境前端与幕间。
+TEST 断言已通过 GitHub Database Migration 工作流；生产不会运行虚构身份测试。
+部署成功只表示站点和接口已发布；真实视频、Telegram 跳转与归因闭环仍需真机验收。
 详细归因口径、验证与剩余环境条件见该仓库 docs/mujian-integration.md。
